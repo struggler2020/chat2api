@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>登录</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         #popup {
             display: none;
@@ -34,7 +35,6 @@
 
     <div id="popup" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
         <div class="bg-white p-8 rounded-xl shadow-lg max-w-lg w-full h-auto">
-<!--            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">请输入您的 Token</h3>-->
             <p class="font-semibold text-gray-800 text-center mb-1">直接点击
                 <span class="font-bold text-indigo-600">开始</span>
                 进入最近用过的账号</p>
@@ -48,7 +48,7 @@
             ></textarea>
             <div class="flex justify-center space-x-4">
                 <button
-                    onclick="submitToken()"
+                    onclick="validateAndSubmit()"
                     class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200 ease-in-out"
                 >
                     开 始
@@ -70,11 +70,60 @@
 
         function closePopup() {
             document.getElementById('popup').style.display = 'none';
+            document.getElementById('popup-input').value = ''; // 清空输入
         }
 
-        function submitToken() {
-            var inputValue = document.getElementById('popup-input').value;
-            window.location.href = '/?token=' + inputValue;
+        // 密钥加密函数
+        function encryptKey(key) {
+            return CryptoJS.SHA256(key).toString();
+        }
+
+        // 验证密钥格式
+        function isValidKeyFormat(key) {
+            // 验证是否为15个字符且只包含大写字母和数字
+            const keyRegex = /^[A-F0-9]{15}$/;
+            return keyRegex.test(key);
+        }
+
+        // 从文件加载有效密钥列表
+        async function loadValidKeys() {
+            try {
+                const response = await window.fs.readFile('tokens.txt', { encoding: 'utf8' });
+                return response.split('\n').filter(key => key.trim() !== '');
+            } catch (error) {
+                console.error('Error loading valid keys:', error);
+                return [];
+            }
+        }
+
+        // 验证密钥是否在有效列表中
+        async function validateKey(key) {
+            const validKeys = await loadValidKeys();
+            const encryptedKey = encryptKey(key);
+            return validKeys.includes(encryptedKey);
+        }
+
+        // 验证和提交函数
+        async function validateAndSubmit() {
+            const inputValue = document.getElementById('popup-input').value.trim();
+            
+            if (!isValidKeyFormat(inputValue)) {
+                alert('密钥无效，请核实后登陆');
+                return;
+            }
+
+            const isValid = await validateKey(inputValue);
+            if (!isValid) {
+                alert('密钥无效，请核实后登陆');
+                return;
+            }
+
+            // 验证通过，继续提交
+            submitToken(inputValue);
+        }
+
+        function submitToken(token) {
+            window.location.href = '/?token=' + encodeURIComponent(token);
             closePopup();
         }
     </script>
